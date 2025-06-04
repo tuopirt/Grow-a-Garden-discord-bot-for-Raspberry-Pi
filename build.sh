@@ -1,2 +1,2 @@
 #!/bin/bash
-playwright install chromium
+npx playwright install --with-deps
