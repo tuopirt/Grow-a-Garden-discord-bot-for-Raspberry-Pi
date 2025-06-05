@@ -32,7 +32,8 @@ subscriptions = load_subs()
 # token/apis
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
-CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
+CHANNEL_IDS = [int(cid.strip()) for cid in os.getenv("CHANNEL_IDS", "").split(",") if cid.strip()]
+
 
 
 # Set up bot with command prefix
@@ -52,14 +53,8 @@ async def wait_until_next_5_minute_mark():
 
 
 # Action sends update to discord channel
-async def send_stock_update(channel):
+async def send_stock_update(channel, stock):
     global last_stock_snapshot # last seen
-    #await asyncio.sleep(30)  # hardcode wait 30s for website to update
-    stock = await scrape_garden_stock() # scrape
-    #error handle
-    if not stock:
-        await channel.send("⚠️ Failed to fetch stock data.")
-        return
 
     msg = "**🌱 GrowAGarden Stock Update 🌱**\n"
 
@@ -98,19 +93,33 @@ async def send_stock_update(channel):
 # Loop every 5 min
 async def periodic_stock_task():
     await bot.wait_until_ready()
-    channel = bot.get_channel(CHANNEL_ID)
     while True:
-        await send_stock_update(channel)
+        stock = await scrape_garden_stock() # scrape
+        #error handle
+        if not stock:
+            await channel.send("⚠️ Failed to fetch stock data.")
+            return
+        
+        for channel_id in CHANNEL_IDS:
+            channel = bot.get_channel(channel_id)
+            if channel:
+                await send_stock_update(channel, stock)
         await wait_until_next_5_minute_mark()
 
 
 # Manual command: !update
 @bot.command(name="update")
 async def force_update(ctx):
-    if ctx.channel.id != CHANNEL_ID:
+    #if ctx.channel.id != CHANNEL_ID:
+    stock = await scrape_garden_stock() # scrape
+    if not stock:
+        await ctx.send("⚠️ Failed to fetch stock data.")
+        return
+    
+    if ctx.channel.id not in CHANNEL_IDS:
         return
     await ctx.send("🔄 Forcing a stock update...")
-    await send_stock_update(ctx.channel)
+    await send_stock_update(ctx.channel, stock)
 
 # Command: turn on alert for specific item
 @bot.command(name="sub")
