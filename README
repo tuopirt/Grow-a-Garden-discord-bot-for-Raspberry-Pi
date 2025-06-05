@@ -110,8 +110,17 @@ Chromium may use more memory than usual on a Pi; ensure you’re not overloaded
 
 The site must remain available and unchanged in structure for scraping to work
 
+UPDATES:
+- added command feature to ping for certain items
+- !sub [item name]: Nofity me this item,
+  !unsub [item name]: Remove notification for this item,
+  !mylist: List of items you set notification to,
+  !update: force an update of the current stock
+
+- Keep track of prev update list so it doesn't ping user if item on list every 5 min
 
 
 
 Made with ☕ by Harrison "tuopirt" Zhou
+contact: harryzhou.ca@gmail.com
 ---
