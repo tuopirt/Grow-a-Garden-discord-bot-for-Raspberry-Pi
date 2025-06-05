@@ -35,7 +35,6 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_IDS = [int(cid.strip()) for cid in os.getenv("CHANNEL_IDS", "").split(",") if cid.strip()]
 
 
-
 # Set up bot with command prefix
 intents = discord.Intents.default()
 intents.message_content = True
@@ -94,23 +93,28 @@ async def send_stock_update(channel, stock):
 async def periodic_stock_task():
     await bot.wait_until_ready()
     while True:
-        stock = await scrape_garden_stock() # scrape
-        #error handle
+        stock = await scrape_garden_stock()  # scrape
+        # error handle
         if not stock:
-            await channel.send("⚠️ Failed to fetch stock data.")
-            return
-        
+            for channel_id in CHANNEL_IDS:
+                channel = bot.get_channel(channel_id)
+                if channel:
+                    await channel.send("⚠️ Failed to fetch stock data.")
+            await wait_until_next_5_minute_mark()
+            continue
+
         for channel_id in CHANNEL_IDS:
             channel = bot.get_channel(channel_id)
             if channel:
                 await send_stock_update(channel, stock)
+
         await wait_until_next_5_minute_mark()
 
 
 # Manual command: !update
 @bot.command(name="update")
 async def force_update(ctx):
-    #if ctx.channel.id != CHANNEL_ID:
+    await ctx.send("🔄 Forcing a stock update...")
     stock = await scrape_garden_stock() # scrape
     if not stock:
         await ctx.send("⚠️ Failed to fetch stock data.")
@@ -118,7 +122,7 @@ async def force_update(ctx):
     
     if ctx.channel.id not in CHANNEL_IDS:
         return
-    await ctx.send("🔄 Forcing a stock update...")
+    
     await send_stock_update(ctx.channel, stock)
 
 # Command: turn on alert for specific item
