@@ -33,9 +33,10 @@ subscriptions = load_subs()
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_IDS = [int(cid.strip()) for cid in os.getenv("CHANNEL_IDS", "").split(",") if cid.strip()]
+#print("Parsed list:", CHANNEL_IDS)
 
 
-# Set up bot with command prefix
+# Set up bot with command prefix for discord
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -47,12 +48,20 @@ async def wait_until_next_5_minute_mark():
     now = datetime.now()
     minutes_to_wait = 5 - (now.minute % 5) # irl 5 min interval
     next_time = now + timedelta(minutes=minutes_to_wait)
-    next_time = next_time.replace(second=30, microsecond=0)
+    next_time = next_time.replace(second=30, microsecond=0) # hardcoded 30s for the site to refresh
     await asyncio.sleep((next_time - now).total_seconds())
 
 
+# Sends the actual message to all the different channels
+async def send_message(msg):
+    for channel_id in CHANNEL_IDS:
+        channel = bot.get_channel(channel_id)
+        if channel:
+            await channel.send(msg)
+
+
 # Action sends update to discord channel
-async def send_stock_update(channel, stock):
+async def create_message(stock):
     global last_stock_snapshot # last seen
 
     msg = "**🌱 GrowAGarden Stock Update 🌱**\n"
@@ -72,28 +81,28 @@ async def send_stock_update(channel, stock):
             for name, qty in items:
                 # loop to add to dict if its item user wants
                 for user_id, user_items in subscriptions.items():
+                    # can add here in the future to check to see if that user is in the current server or not
                     if name.lower() in map(str.lower, user_items):
                         mentions[name].append(f"<@{user_id}>")
                         has_alerts = True
-    
+        
         last_stock_snapshot[category] = items
-
     
     # dict part 2
     if has_alerts:
         msg += "\n\n🔔 **Alerts:**\n"
         for item, users in mentions.items():
             msg += f"{item}: {' '.join(users)}\n"
+    
+    await send_message(msg)
 
-    #send to chan
-    await channel.send(msg)
 
-
-# Loop every 5 min
-async def periodic_stock_task():
+# Main func
+async def main():
     await bot.wait_until_ready()
     while True:
         stock = await scrape_garden_stock()  # scrape
+
         # error handle
         if not stock:
             for channel_id in CHANNEL_IDS:
@@ -102,12 +111,9 @@ async def periodic_stock_task():
                     await channel.send("⚠️ Failed to fetch stock data.")
             await wait_until_next_5_minute_mark()
             continue
-
-        for channel_id in CHANNEL_IDS:
-            channel = bot.get_channel(channel_id)
-            if channel:
-                await send_stock_update(channel, stock)
-
+        
+        # create the discord msg (it will send within it)
+        await create_message(stock)
         await wait_until_next_5_minute_mark()
 
 
@@ -115,6 +121,7 @@ async def periodic_stock_task():
 @bot.command(name="update")
 async def force_update(ctx):
     await ctx.send("🔄 Forcing a stock update...")
+    #if ctx.channel.id != CHANNEL_ID:
     stock = await scrape_garden_stock() # scrape
     if not stock:
         await ctx.send("⚠️ Failed to fetch stock data.")
@@ -123,7 +130,7 @@ async def force_update(ctx):
     if ctx.channel.id not in CHANNEL_IDS:
         return
     
-    await send_stock_update(ctx.channel, stock)
+    await create_message(ctx.channel, stock)
 
 # Command: turn on alert for specific item
 @bot.command(name="sub")
@@ -191,6 +198,6 @@ async def on_command_error(ctx, error):
 @bot.event
 async def on_ready():
     print(f"Bot connected as {bot.user}")
-    bot.loop.create_task(periodic_stock_task())
+    bot.loop.create_task(main())
 
 bot.run(TOKEN)
