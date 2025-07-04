@@ -121,6 +121,6 @@ UPDATES:
 
 
 
-Made with ☕ by Harrison "tuopirt" Zhou
+by Harrison "tuopirt" Zhou
 contact: harryzhou.ca@gmail.com
 ---
